@@ -1,30 +1,782 @@
 <!doctype html>
-<!-- Define o tipo do documento como HTML5 -->
 <html lang="en">
 <head>
-  <title>Websocket Client</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Server — Ruby</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --border: #1e1e1e;
+      --accent: #00ff88;
+      --accent2: #ff6b35;
+      --accent3: #4fc3f7;
+      --text: #e0e0e0;
+      --muted: #555;
+      --code-bg: #0d1117;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      cursor: crosshair;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* Noise texture */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      opacity: 0.02;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 998;
+    }
+
+    /* ── HEADER ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .github-link {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+      padding: 0.4rem 0.8rem;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+
+    .github-link:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(0,255,136,0.04);
+    }
+
+    .github-link svg { width: 14px; height: 14px; fill: currentColor; }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 6rem 2rem 4rem;
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .hero-tag {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.1s;
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.2s;
+    }
+
+    .hero h1 span { color: var(--accent); }
+    .hero h1 em { color: var(--accent2); font-style: normal; }
+
+    .hero-desc {
+      font-size: 0.95rem;
+      color: #888;
+      max-width: 560px;
+      line-height: 1.8;
+      margin-bottom: 2.5rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.3s;
+    }
+
+    .hero-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.4s;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      padding: 0.3rem 0.7rem;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .badge.green { border-color: rgba(0,255,136,0.3); color: var(--accent); }
+    .badge.orange { border-color: rgba(255,107,53,0.3); color: var(--accent2); }
+    .badge.blue { border-color: rgba(79,195,247,0.3); color: var(--accent3); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── DEMO TERMINAL ── */
+    .demo-section {
+      padding: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards 0.5s;
+    }
+
+    .terminal {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .terminal-bar {
+      background: #161b22;
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .terminal-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .terminal-dot.red { background: #ff5f57; }
+    .terminal-dot.yellow { background: #febc2e; }
+    .terminal-dot.green { background: #28c840; }
+
+    .terminal-title {
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+
+    .terminal-body {
+      padding: 1.5rem;
+      font-size: 0.82rem;
+      line-height: 1.9;
+      min-height: 120px;
+    }
+
+    .terminal-body .prompt { color: var(--accent); }
+    .terminal-body .comment { color: #444; }
+    .terminal-body .key { color: var(--accent3); }
+    .terminal-body .val { color: var(--accent2); }
+    .terminal-body .success { color: var(--accent); }
+    .terminal-body .info { color: #888; }
+
+    .cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--accent);
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    /* ── LIVE DEMO ── */
+    .live-demo {
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .live-demo-header {
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .live-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.7rem;
+    }
+
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected { background: var(--accent); animation: pulse 1.5s infinite; }
+    .status-dot.error { background: var(--accent2); }
+
+    .status-text { color: var(--muted); transition: color 0.3s; }
+    .status-text.connected { color: var(--accent); }
+    .status-text.error { color: var(--accent2); }
+
+    .live-demo-body { padding: 1rem; }
+
+    .connect-btn {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 0.5rem 1.2rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    .connect-btn:hover {
+      background: rgba(0,255,136,0.08);
+    }
+
+    .connect-btn:disabled {
+      border-color: var(--muted);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+
+    .message-log {
+      margin-top: 1rem;
+      border: 1px solid var(--border);
+      background: var(--code-bg);
+      min-height: 80px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 0.8rem;
+      font-size: 0.78rem;
+      line-height: 1.8;
+    }
+
+    .log-entry { display: flex; gap: 0.8rem; }
+    .log-time { color: var(--muted); flex-shrink: 0; }
+    .log-sent { color: var(--accent3); }
+    .log-recv { color: var(--accent); }
+    .log-err  { color: var(--accent2); }
+    .log-sys  { color: #555; }
+
+    .msg-input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.8rem;
+    }
+
+    .msg-input {
+      flex: 1;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      padding: 0.5rem 0.8rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .msg-input:focus { border-color: var(--accent3); }
+    .msg-input::placeholder { color: var(--muted); }
+
+    .send-btn {
+      background: transparent;
+      border: 1px solid var(--accent3);
+      color: var(--accent3);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .send-btn:hover { background: rgba(79,195,247,0.08); }
+    .send-btn:disabled { border-color: var(--muted); color: var(--muted); cursor: not-allowed; }
+
+    /* ── CONCEPTS ── */
+    .concepts {
+      padding: 4rem 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      padding-bottom: 0.8rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .concepts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .concept-card {
+      background: var(--bg);
+      padding: 1.5rem;
+      transition: background 0.2s;
+    }
+
+    .concept-card:hover { background: var(--surface); }
+
+    .concept-num {
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.8rem;
+    }
+
+    .concept-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+      color: var(--text);
+    }
+
+    .concept-title span { color: var(--accent); }
+
+    .concept-desc {
+      font-size: 0.78rem;
+      color: #666;
+      line-height: 1.7;
+    }
+
+    /* ── FLOW ── */
+    .flow {
+      padding: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.2s;
+    }
+
+    .flow-step:last-child { border-bottom: none; }
+    .flow-step:hover { background: var(--surface); }
+
+    .flow-num {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: var(--muted);
+      border-right: 1px solid var(--border);
+      padding: 1rem;
+    }
+
+    .flow-content {
+      padding: 1rem 1.2rem;
+    }
+
+    .flow-title {
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-bottom: 0.2rem;
+    }
+
+    .flow-desc {
+      font-size: 0.75rem;
+      color: #555;
+    }
+
+    /* ── CODE BLOCK ── */
+    .code-section {
+      padding: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      overflow-x: auto;
+      font-size: 0.78rem;
+      line-height: 1.8;
+    }
+
+    .c-keyword { color: #ff7b72; }
+    .c-string  { color: #a5d6ff; }
+    .c-comment { color: #3d4451; }
+    .c-method  { color: #d2a8ff; }
+    .c-number  { color: #f2cc60; }
+    .c-var     { color: var(--accent3); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--muted);
+      max-width: 100%;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
+  </style>
 </head>
 <body>
+
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      WS://RUBY
+    </div>
+    <a class="github-link" href="https://github.com/ItaloSLeao/Websocket-Server-Ruby" target="_blank">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      ItaloSLeao/Websocket-Server-Ruby
+    </a>
+  </header>
+
+  <section class="hero">
+    <div class="hero-tag">// low-level networking in Ruby</div>
+    <h1>WebSocket<br>Server <em>from</em><br><span>scratch.</span></h1>
+    <p class="hero-desc">
+      A WebSocket server built on raw TCP sockets in pure Ruby — no gems, no frameworks.
+      Implements the RFC 6455 handshake, binary frame parsing, XOR unmasking, and bidirectional messaging.
+    </p>
+    <div class="hero-badges">
+      <span class="badge green">RFC 6455</span>
+      <span class="badge green">TCP Sockets</span>
+      <span class="badge orange">XOR Unmasking</span>
+      <span class="badge orange">SHA-1 Handshake</span>
+      <span class="badge blue">Ruby 3.3</span>
+      <span class="badge blue">Zero dependencies</span>
+    </div>
+  </section>
+
+  <section class="demo-section">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="terminal-dot red"></div>
+        <div class="terminal-dot yellow"></div>
+        <div class="terminal-dot green"></div>
+        <span class="terminal-title">server.rb — ruby</span>
+      </div>
+      <div class="terminal-body" id="serverLog">
+        <div><span class="prompt">$ </span>ruby server.rb</div>
+        <div><span class="info">Waiting for connections on port 2345...</span></div>
+      </div>
+    </div>
+
+    <div class="live-demo">
+      <div class="live-demo-header">
+        <span class="live-label">// live demo</span>
+        <div class="status-indicator">
+          <div class="status-dot" id="statusDot"></div>
+          <span class="status-text" id="statusText">disconnected</span>
+        </div>
+      </div>
+      <div class="live-demo-body">
+        <button class="connect-btn" id="connectBtn" onclick="toggleConnect()">connect_to_server()</button>
+        <div class="message-log" id="messageLog">
+          <div class="log-entry"><span class="log-sys">// press connect to start the WebSocket handshake</span></div>
+        </div>
+        <div class="msg-input-row">
+          <input class="msg-input" id="msgInput" placeholder="type a message..." disabled onkeydown="if(event.key==='Enter') sendMsg()">
+          <button class="send-btn" id="sendBtn" onclick="sendMsg()" disabled>send()</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="concepts">
+    <div class="section-label">// core concepts</div>
+    <div class="concepts-grid">
+      <div class="concept-card">
+        <div class="concept-num">01</div>
+        <div class="concept-title">TCP <span>Foundation</span></div>
+        <div class="concept-desc">WebSocket rides on top of TCP — the transport layer guarantees ordered, reliable byte delivery. The OS handles the three-way handshake (SYN → SYN-ACK → ACK) before our code even runs.</div>
+      </div>
+      <div class="concept-card">
+        <div class="concept-num">02</div>
+        <div class="concept-title">HTTP <span>Upgrade</span></div>
+        <div class="concept-desc">Every WebSocket starts as a plain HTTP GET request. The client sends <code>Upgrade: websocket</code>. The server responds with <code>101 Switching Protocols</code>. After that line break — HTTP is gone forever.</div>
+      </div>
+      <div class="concept-card">
+        <div class="concept-num">03</div>
+        <div class="concept-title">SHA-1 <span>Handshake</span></div>
+        <div class="concept-desc">The client sends a random base64 key. The server concatenates it with the RFC 6455 magic string, SHA-1 hashes the result, and returns it as <code>Sec-WebSocket-Accept</code>. Browser validates before proceeding.</div>
+      </div>
+      <div class="concept-card">
+        <div class="concept-num">04</div>
+        <div class="concept-title">Binary <span>Frames</span></div>
+        <div class="concept-desc">Post-handshake, HTTP text is replaced by binary frames. Each frame is parsed byte-by-byte: FIN bit, opcode (text/binary/close/ping), mask flag, payload length, masking key, and finally the payload.</div>
+      </div>
+      <div class="concept-card">
+        <div class="concept-num">05</div>
+        <div class="concept-title">XOR <span>Unmasking</span></div>
+        <div class="concept-desc">The RFC requires all client→server frames to be masked. Each payload byte is XOR'd with the corresponding byte of a 4-byte key (cycling with % 4). XOR is reversible: (A⊕B)⊕B = A.</div>
+      </div>
+      <div class="concept-card">
+        <div class="concept-num">06</div>
+        <div class="concept-title">Full <span>Duplex</span></div>
+        <div class="concept-desc">Unlike HTTP's request→response→close cycle, the WebSocket connection stays open. Either side can send frames at any time — enabling real-time chat, live dashboards, and multiplayer games.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="flow">
+    <div class="section-label">// connection lifecycle</div>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-num">01</div>
+        <div class="flow-content">
+          <div class="flow-title">TCP_CONNECT</div>
+          <div class="flow-desc">Browser opens a TCP connection to localhost:2345. OS performs SYN → SYN-ACK → ACK three-way handshake.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">02</div>
+        <div class="flow-content">
+          <div class="flow-title">HTTP_UPGRADE_REQUEST</div>
+          <div class="flow-desc">Browser sends GET / with headers: Upgrade: websocket, Sec-WebSocket-Key: [random base64]</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">03</div>
+        <div class="flow-content">
+          <div class="flow-title">SHA1_HANDSHAKE</div>
+          <div class="flow-desc">Server computes SHA1(key + magic_string), base64-encodes it, replies with HTTP 101 + Sec-WebSocket-Accept.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">04</div>
+        <div class="flow-content">
+          <div class="flow-title">FRAME_PARSE</div>
+          <div class="flow-desc">Browser sends binary frame. Server reads byte-by-byte: FIN/opcode → mask/length → masking key → payload.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">05</div>
+        <div class="flow-content">
+          <div class="flow-title">XOR_UNMASK</div>
+          <div class="flow-desc">Server XORs each payload byte against mask[i % 4], converting masked bytes back to readable UTF-8.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-num">06</div>
+        <div class="flow-content">
+          <div class="flow-title">FRAME_RESPONSE</div>
+          <div class="flow-desc">Server builds response frame [0b10000001, size, payload] and writes it. Browser fires onmessage callback.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="code-section">
+    <div class="section-label">// the unmasking algorithm</div>
+    <pre><span class="c-comment"># XOR unmasking — RFC 6455 §5.3</span>
+<span class="c-var">mask</span> = <span class="c-number">4</span>.<span class="c-method">times</span>.<span class="c-method">map</span> { socket.<span class="c-method">getbyte</span> }
+<span class="c-var">data</span> = payload_size.<span class="c-method">times</span>.<span class="c-method">map</span> { socket.<span class="c-method">getbyte</span> }
+
+<span class="c-var">unmasked</span> = <span class="c-var">data</span>.<span class="c-method">each_with_index</span>.<span class="c-method">map</span> <span class="c-keyword">do</span> |<span class="c-var">byte</span>, <span class="c-var">i</span>|
+  <span class="c-var">byte</span> ^ <span class="c-var">mask</span>[<span class="c-var">i</span> % <span class="c-number">4</span>]  <span class="c-comment"># XOR is reversible: (A⊕B)⊕B = A</span>
+<span class="c-keyword">end</span>
+
+<span class="c-var">message</span> = <span class="c-var">unmasked</span>.<span class="c-method">pack</span>(<span class="c-string">'C*'</span>).<span class="c-method">force_encoding</span>(<span class="c-string">'utf-8'</span>)</pre>
+  </section>
+
+  <footer>
+    <span>built with raw TCP sockets in Ruby 3.3 — zero dependencies</span>
+    <a href="https://github.com/ItaloSLeao/Websocket-Server-Ruby" target="_blank">
+      github.com/ItaloSLeao/Websocket-Server-Ruby
+    </a>
+  </footer>
+
   <script>
-    // Abre uma conexão WebSocket com o servidor na porta 2345
-    // "ws://" é o protocolo WebSocket — equivalente ao "http://" mas para WebSockets
-    // O navegador automaticamente faz o handshake HTTP → WebSocket por baixo dos panos
-    var exampleSocket = new WebSocket("ws://localhost:2345");
+    let ws = null;
+    let connected = false;
 
-    // Callback executado quando a conexão WebSocket é estabelecida com sucesso
-    // Só é chamado APÓS o handshake ser completado
-    exampleSocket.onopen = function (event) {
-      exampleSocket.send("Can you hear me?");
-      // Envia uma mensagem de texto ao servidor pelo canal WebSocket aberto
-      // O navegador automaticamente empacota isso no formato de frame WebSocket
-    };
+    function log(msg, type = 'sys') {
+      const log = document.getElementById('messageLog');
+      const time = new Date().toLocaleTimeString('en', {hour12: false});
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = `<span class="log-time">${time}</span><span class="log-${type}">${msg}</span>`;
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
 
-    // Callback executado quando o servidor envia uma mensagem de volta
-    // event.data contém o conteúdo da mensagem recebida
-    exampleSocket.onmessage = function (event) {
-      console.log(event.data);
-      // Imprime a resposta do servidor no console do navegador
-      // Você verá "Loud and clear!" aqui após o servidor responder
+    function serverLog(msg, type = 'info') {
+      const sl = document.getElementById('serverLog');
+      const div = document.createElement('div');
+      div.innerHTML = `<span class="${type}">${msg}</span>`;
+      sl.appendChild(div);
+    }
+
+    function setStatus(state) {
+      const dot = document.getElementById('statusDot');
+      const txt = document.getElementById('statusText');
+      dot.className = 'status-dot ' + state;
+      txt.className = 'status-text ' + state;
+      txt.textContent = state === 'connected' ? 'connected' : state === 'error' ? 'error' : 'disconnected';
+    }
+
+    function toggleConnect() {
+      if (connected) {
+        ws.close();
+        return;
+      }
+
+      const btn = document.getElementById('connectBtn');
+      btn.textContent = 'connecting...';
+      btn.disabled = true;
+
+      log('initiating TCP connection to ws://localhost:2345', 'sys');
+      serverLog('Incoming Request', 'comment');
+
+      ws = new WebSocket('ws://localhost:2345');
+
+      ws.onopen = () => {
+        connected = true;
+        setStatus('connected');
+        btn.textContent = 'disconnect()';
+        btn.disabled = false;
+        document.getElementById('msgInput').disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        log('TCP connected — HTTP upgrade complete — WebSocket active', 'recv');
+        serverLog('Websocket handshake completed.', 'success');
+        ws.send('Can you hear me?');
+        log('→ sent: "Can you hear me?"', 'sent');
+        serverLog('Received message: "Can you hear me?"', 'key');
+      };
+
+      ws.onmessage = (e) => {
+        log(`← recv: "${e.data}"`, 'recv');
+        serverLog(`Sending response: "${e.data}"`, 'val');
+      };
+
+      ws.onerror = () => {
+        setStatus('error');
+        log('connection error — is server.rb running?', 'err');
+        btn.textContent = 'connect_to_server()';
+        btn.disabled = false;
+        connected = false;
+      };
+
+      ws.onclose = () => {
+        connected = false;
+        setStatus('');
+        btn.textContent = 'connect_to_server()';
+        btn.disabled = false;
+        document.getElementById('msgInput').disabled = true;
+        document.getElementById('sendBtn').disabled = true;
+        log('connection closed', 'sys');
+      };
+    }
+
+    function sendMsg() {
+      const input = document.getElementById('msgInput');
+      const msg = input.value.trim();
+      if (!msg || !ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(msg);
+      log(`→ sent: "${msg}"`, 'sent');
+      input.value = '';
     }
   </script>
 </body>
