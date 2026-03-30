@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- Define o tipo do documento como HTML5 -->
+<html lang="en">
+<head>
+  <title>Websocket Client</title>
+</head>
+<body>
+  <script>
+    // Abre uma conexão WebSocket com o servidor na porta 2345
+    // "ws://" é o protocolo WebSocket — equivalente ao "http://" mas para WebSockets
+    // O navegador automaticamente faz o handshake HTTP → WebSocket por baixo dos panos
+    var exampleSocket = new WebSocket("ws://localhost:2345");
+
+    // Callback executado quando a conexão WebSocket é estabelecida com sucesso
+    // Só é chamado APÓS o handshake ser completado
+    exampleSocket.onopen = function (event) {
+      exampleSocket.send("Can you hear me?");
+      // Envia uma mensagem de texto ao servidor pelo canal WebSocket aberto
+      // O navegador automaticamente empacota isso no formato de frame WebSocket
+    };
+
+    // Callback executado quando o servidor envia uma mensagem de volta
+    // event.data contém o conteúdo da mensagem recebida
+    exampleSocket.onmessage = function (event) {
+      console.log(event.data);
+      // Imprime a resposta do servidor no console do navegador
+      // Você verá "Loud and clear!" aqui após o servidor responder
+    }
+  </script>
+</body>
+</html>
