@@ -35,6 +35,8 @@ A implementação busca simular o comportamento de servidores modernos utilizado
   - Mensagens recebidas
   - Encerramento de conexões
  
-##
- 
-![Browser image][browser.png]
+#
+
+<div align="center">
+  <img src="browser.png" alt="Browser image">
+</div>
