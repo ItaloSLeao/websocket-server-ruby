@@ -34,3 +34,7 @@ A implementação busca simular o comportamento de servidores modernos utilizado
   - Conexões abertas
   - Mensagens recebidas
   - Encerramento de conexões
+ 
+##
+ 
+![Browser image][browser.png]
