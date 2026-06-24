@@ -1,4 +1,4 @@
-# WebSocket Server from Scratch in Ruby ♦️
+# WebSocket Server from Scratch in Ruby
 
 Este repositório contém a implementação de um servidor **WebSocket** desenvolvido em **Ruby**, com foco no entendimento profundo de comunicação em tempo real e protocolos de rede. 
 O projeto foi construído sem o uso de bibliotecas de alto nível, manipulando diretamente sockets TCP e o handshake do protocolo WebSocket.
@@ -34,9 +34,3 @@ A implementação busca simular o comportamento de servidores modernos utilizado
   - Conexões abertas
   - Mensagens recebidas
   - Encerramento de conexões
- 
-#
-
-<div align="center">
-  <img src="browser.png" alt="Browser image">
-</div>
